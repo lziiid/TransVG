@@ -4,7 +4,7 @@ import torchvision
 from torchvision.transforms import Compose, ToTensor, Normalize
 
 import datasets.transforms as T
-from .data_loader import TransVGDataset
+from .data_loader import TransVGDataset, KnowVGDataset
 
 
 def make_transforms(args, image_set, is_onestage=False):
@@ -57,9 +57,16 @@ def make_transforms(args, image_set, is_onestage=False):
 
     raise ValueError(f'unknown {image_set}')
 
-
 def build_dataset(split, args):
-    return TransVGDataset(data_root=args.data_root,
+    if args.dataset == "KnowVG":
+        data_root = args.data_root + "knowVGData/"
+        json_path = data_root + split + ".json"
+        return KnowVGDataset(json_path=json_path,
+                             data_path=data_root,
+                             transform=make_transforms(args, split),
+                             max_query_len=args.max_query_len)
+    else:
+        return TransVGDataset(data_root=args.data_root,
                         split_root=args.split_root,
                         dataset=args.dataset,
                         split=split,

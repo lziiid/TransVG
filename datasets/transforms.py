@@ -163,7 +163,7 @@ class RandomHorizontalFlip(object):
 
 
 class RandomResize(object):
-    def __init__(self, sizes, with_long_side=True):
+    def  __init__(self, sizes, with_long_side=True):
         assert isinstance(sizes, (list, tuple))
         self.sizes = sizes
         self.with_long_side = with_long_side

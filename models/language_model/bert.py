@@ -24,8 +24,7 @@ class BERT(nn.Module):
         else:
             self.num_channels = 1024
         self.enc_num = enc_num
-
-        self.bert = BertModel.from_pretrained(name)
+        self.bert = BertModel.from_pretrained(".")
 
         if not train_bert:
             for parameter in self.bert.parameters():

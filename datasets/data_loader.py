@@ -162,7 +162,9 @@ class TransVGDataset(data.Dataset):
         self.transform = transform
         self.testmode = testmode
         self.split = split
-        self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=True)
+        # 临时修改，有网改回
+        # self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=True)
+        self.tokenizer = BertTokenizer(vocab_file="vocab.txt", do_lower_case=True)
         self.return_idx=return_idx
 
         assert self.transform is not None
@@ -253,12 +255,20 @@ class TransVGDataset(data.Dataset):
         img, phrase, bbox = self.pull_item(idx)
         # phrase = phrase.decode("utf-8").encode().lower()
         phrase = phrase.lower()
+
+        # img.save("tmp1/" + str(idx) + "ori.jpg")
+
         input_dict = {'img': img, 'box': bbox, 'text': phrase}
         input_dict = self.transform(input_dict)
         img = input_dict['img']
         bbox = input_dict['box']
         phrase = input_dict['text']
         img_mask = input_dict['mask']
+
+        # # 看一看处理完后的图片
+        # tmp = img.permute(1, 2, 0).numpy()
+        # tmp = (tmp * 255).astype(np.uint8)
+        # Image.fromarray(tmp).save("tmp1/" + str(idx) + ".jpg")
         
         if self.lstm:
             phrase = self.tokenize_phrase(phrase)
@@ -279,3 +289,76 @@ class TransVGDataset(data.Dataset):
         else:
             # print(img.shape)
             return img, np.array(img_mask), np.array(word_id, dtype=int), np.array(word_mask, dtype=int), np.array(bbox, dtype=np.float32)
+
+
+class KnowVGDataset(data.Dataset):
+    # split = 'train' or 'val'
+    def __init__(self, json_path, data_path, testmode=False, transform=None,
+                 max_query_len=128, bert_model='bert-base-uncase', visualize=False):
+        with open(json_path, 'r') as f:
+            self.json_dict = json.load(f)
+        self.data_path = data_path
+        self.test_mode = testmode
+        self.query_len = max_query_len
+        # 临时修改，有网改回
+        # self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=True)
+        self.tokenizer = BertTokenizer(vocab_file="vocab.txt", do_lower_case=True)
+        self.transform = transform
+        self.testmode = testmode
+        self.visualize = visualize
+        assert self.transform is not None
+
+
+    def __getitem__(self, idx):
+        item = self.json_dict[idx]
+
+        img_path = self.data_path + item["imgname"]
+        img = Image.open(img_path).convert("RGB")
+
+        # [x, y, width, height] -> upper left & lower right
+        bbox = item['bbox']
+        bbox = [bbox['x'], bbox['y'], bbox['x']+bbox['width'], bbox['y']+bbox['height']]
+        bbox = torch.tensor(np.array(bbox, dtype=int))
+        bbox = bbox.float()
+
+        # how to handle story && query?
+        story = item['knowledge']
+        ref = item['refExp']
+
+        phrase = story + ref
+        phrase = phrase.lower()
+
+        if self.visualize:
+            img.save("tmp/" + str(idx) + "ori.jpg")
+
+        input_dict = {'img': img, 'box': bbox, 'text': phrase}
+        input_dict = self.transform(input_dict)
+        img = input_dict['img']
+        bbox = input_dict['box']
+        phrase = input_dict['text']
+        img_mask = input_dict['mask']
+
+        # 图片可视化
+        if self.visualize:
+            tmp = img.permute(1, 2, 0).numpy()
+            tmp = (tmp * 255).astype(np.uint8)
+            Image.fromarray(tmp).save("tmp/" + str(idx) + ".jpg")
+
+        # encode phrase to bert input
+        examples = read_examples(phrase, idx)
+        features = convert_examples_to_features(
+            examples=examples, seq_length=self.query_len, tokenizer=self.tokenizer)
+        word_id = features[0].input_ids
+        word_mask = features[0].input_mask
+
+        if self.testmode:
+            return img, np.array(word_id, dtype=int), np.array(word_mask, dtype=int), \
+                np.array(bbox, dtype=np.float32), np.array(ratio, dtype=np.float32), \
+                np.array(dw, dtype=np.float32), np.array(dh, dtype=np.float32), self.images[idx][0]
+        else:
+            # print(img.shape)
+            return img, np.array(img_mask), np.array(word_id, dtype=int), np.array(word_mask, dtype=int), np.array(bbox, dtype=np.float32)
+
+
+    def __len__(self):
+        return len(self.json_dict)

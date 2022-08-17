@@ -127,6 +127,7 @@ def get_args_parser():
 
 def main(args):
     utils.init_distributed_mode(args)
+
     print("git:\n  {}\n".format(utils.get_sha()))
 
     device = torch.device(args.device)
@@ -142,8 +143,10 @@ def main(args):
 
     model_without_ddp = model
     if args.distributed:
+        print("OVO")
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
+        print("QAQ")
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
 
@@ -247,6 +250,13 @@ def main(args):
                      **{f'validation_{k}': v for k, v in val_stats.items()},
                      'epoch': epoch,
                      'n_parameters': n_parameters}
+
+        # knowvg bug fixed?
+        if isinstance(log_stats["validation_miou"], torch.Tensor):
+            log_stats["validation_miou"] = log_stats["validation_miou"].item()
+
+        if isinstance(log_stats["validation_accu"], torch.Tensor):
+            log_stats["validation_accu"] = log_stats["validation_accu"].item()
 
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:

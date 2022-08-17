@@ -34,6 +34,7 @@ def bbox_iou(box1, box2, x1y1x2y2=True):
 
 
 def xywh2xyxy(x):
+
     x_c, y_c, w, h = x.unbind(-1)
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
          (x_c + 0.5 * w), (y_c + 0.5 * h)]
